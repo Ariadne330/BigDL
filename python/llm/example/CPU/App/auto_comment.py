@@ -1,11 +1,10 @@
+# 运行方式：python auto_comments.py --path 'path of file or folder'
+# 脚本功能：使用QWen-7B-Chat为提供的代码文件自动生成注释。(详见auto_comments.md)
 
-import torch
-import time
+
 import argparse
 import os
-
-from bigdl.llm.transformers import AutoModelForCausalLM
-from transformers import AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation import GenerationConfig
 
 MaxLine = 50 # 限制单次处理最大代码行数
@@ -15,21 +14,25 @@ CodeFileType = ["py"] # 目前仅测试过对python文件生成注释
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, default='Qwen-7B/eval/evaluate_ceval.py')
-    parser.add_argument('--repo-id-or-model-path', type=str, default="Qwen/Qwen-7B-Chat",
-                        help='The huggingface repo id for the Qwen_VL_Chat model to be downloaded'
-                             ', or the path to the huggingface checkpoint folder') # 传入模型路径
-    parser.add_argument('--regenerate', action='store_true', default=False) # 如果已经生成过注释，默认不会重新生成
+    parser.add_argument('--regenerate', action='store_true', default=False) #如果已经生成过注释，默认不会重新生成
     args = parser.parse_args()
     return args
 
 class QWenChat():
-    def __init__(self, model_path):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    def __init__(self):
+        self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen-7B-Chat", trust_remote_code=True)
 
-        self.model = AutoModelForCausalLM.from_pretrained(model_path,  device_map="cpu", trust_remote_code=True).eval()
-
+        # use bf16
+        # model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen-7B-Chat", device_map="auto", trust_remote_code=True, bf16=True).eval()
+        # use fp16
+        # model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen-7B-Chat", device_map="auto", trust_remote_code=True, fp16=True).eval()
+        # use cpu only
+        # model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen-7B-Chat", device_map="cpu", trust_remote_code=True).eval()
+        # use auto mode, automatically select precision based on the device.
+        self.model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen-7B-Chat", device_map="auto", trust_remote_code=True).eval()
+        
         # Specify hyperparameters for generation
-        self.model.generation_config = GenerationConfig.from_pretrained(model_path, trust_remote_code=True)
+        self.model.generation_config = GenerationConfig.from_pretrained("Qwen/Qwen-7B-Chat", trust_remote_code=True)
         self.history = None
         
     def chat(self, query, system = ""):
@@ -170,7 +173,7 @@ def deal_folder(model, path, args):
             print("Please specify a correct path!")
 
 def transfer(args):
-    model = QWenChat(model_path = args.repo_id_or_model_path)
+    model = QWenChat()
 
     if os.path.isfile(args.path):
         if (args.path.split(".")[-1] in CodeFileType) and ("_comments" not in args.path):
